@@ -33,6 +33,10 @@ void Program::addRandomInstruction() {
     instructions.push_back(instruction);
 }
 
+void Program::addInstruction(uint16_t instruction) {
+    instructions.push_back(instruction);
+}
+
 Program::Program() {
     int numInstructions = getRandomNumber(1, Parameters::MAX_PROGRAM_LENGTH);
     for (int i = 0; i < numInstructions; ++i) {

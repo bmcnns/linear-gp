@@ -16,11 +16,12 @@ private:
     int getRandomNumber(int min, int max);
 
 
-
 public:
     std::vector<uint16_t> instructions;
 
     void addRandomInstruction();
+
+    void addInstruction(uint16_t instruction);
 
     Program();
 
