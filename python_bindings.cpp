@@ -15,7 +15,18 @@ PYBIND11_MODULE(linear_gp, m) {
     .def("execute", &Program::execute)
     .def("displayInstructions", &Program::displayInstructions)
     .def("displayCode", &Program::displayCode)
-    .def("displayRegisters", &Program::displayRegisters);
+    .def("displayRegisters", &Program::displayRegisters)
+    .def("predict", &Program::predict)
+    .def(pybind11::pickle(
+        [](const Program &p) { // __getstate__
+            return p.__getstate__();
+        },
+        [](std::vector<uint32_t> state) { // __setstate__
+            Program p;
+            p.__setstate__(state);
+            return p;
+        }
+    ));
 
     py::class_<Mutator>(m, "Mutator")
     .def(py::init<>())

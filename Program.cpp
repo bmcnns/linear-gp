@@ -17,24 +17,24 @@ int Program::getRandomNumber(int min, int max) {
 
 void Program::addRandomInstruction() {
     int modeBit = getRandomNumber(0, 1);
-    int src = getRandomNumber(0, Parameters::NUM_REGISTERS - 1);
+    int dest = getRandomNumber(0, Parameters::NUM_REGISTERS - 1);
     int opCode = getRandomNumber(0, Parameters::NUM_OP_CODES - 1);
 
-    int dest;
+    int src;
     if (modeBit == 0)
     {
-        dest = getRandomNumber(0, Parameters::NUM_REGISTERS - 1);
+        src = getRandomNumber(0, Parameters::NUM_REGISTERS - 1);
     }
     else {
-        dest = getRandomNumber(0, Parameters::NUM_FEATURES - 1);
+        src = getRandomNumber(0, Parameters::NUM_FEATURES - 1);
     }
 
-    uint16_t instruction = (modeBit << 14) | (src << 11) | (opCode << 8) | dest;
+    uint32_t instruction = (modeBit << MODE_SHIFT) | (opCode << OPCODE_SHIFT) | (dest << DEST_SHIFT) | src;
     instructions.push_back(instruction);
 }
 
-void Program::addInstruction(uint16_t instruction) {
-    instructions.push_back(instruction);
+void Program::addInstruction(uint32_t instruction) {
+  instructions.push_back(instruction);
 }
 
 Program::Program() {
@@ -46,18 +46,14 @@ Program::Program() {
     registers.fill(0.0);
 }
 
-void Program::execute(const std::vector<float>& features) {
+void Program::execute(const std::vector<double>& features) {
     registers.fill(0.0);
 
-    for (const uint16_t instruction : instructions) {
-        // Extract mode bit (bit 14)
-        bool modeBit = (instruction >> 14) & 1;
-        // Extract source register (bits 13-11)
-        int dest = (instruction >> 11) & 0b111;
-        // Extract opcode (bits 10-8)
-        int opCode = (instruction >> 8) & 0b111;
-        // Extract destination register (bits 7-0)
-        int src = (instruction & 0xFF);
+    for (const uint32_t instruction : instructions) {
+        bool modeBit = (instruction >> MODE_SHIFT) & MODE_MASK;
+        int opCode = (instruction >> OPCODE_SHIFT) & OPCODE_MASK;
+        int dest = (instruction >> DEST_SHIFT) & DEST_MASK;
+        int src = (instruction & SRC_MASK);
 
         double sourceValue;
         if (modeBit == 0) {
@@ -75,14 +71,14 @@ void Program::execute(const std::vector<float>& features) {
                 registers[dest] -= sourceValue;
                 break;
             case 2:
-                registers[dest] *= 2.0;
+                registers[dest] *= sourceValue;
                 break;
             case 3:
                 if (sourceValue != 0) {
                     registers[dest] /= sourceValue;
                 }
                 else {
-                    registers[dest] = 0.0;
+                    registers[dest] = 1.0;
                 }
                 break;
             case 4:
@@ -100,12 +96,15 @@ void Program::execute(const std::vector<float>& features) {
     }
 }
 
-
+std::array<double, Parameters::NUM_REGISTERS> Program::predict(const std::vector<double>& features) {
+    execute(features);
+    return registers;
+}
 
 void Program::displayInstructions() const {
     std::cout << "Program instructions (in binary):" << std::endl;
     for (const auto& inst : instructions) {
-        std::cout << std::bitset<15>(inst) << std::endl;
+        std::cout << std::bitset<32>(inst) << std::endl;
     }
 }
 
@@ -118,10 +117,10 @@ void Program::displayRegisters() const {
 
 void Program::displayCode() const {
     for (const auto& instruction : instructions) {
-        bool modeBit = (instruction >> 14) & 1;
-        int dest = (instruction >> 11) & 0b111;
-        int opCode = (instruction >> 8) & 0b111;
-        int src = instruction & 0xFF;
+        bool modeBit = (instruction >> MODE_SHIFT) & MODE_MASK;
+        int opCode = (instruction >> OPCODE_SHIFT) & OPCODE_MASK;
+        int dest = (instruction >> DEST_SHIFT) & DEST_MASK;
+        int src = (instruction & SRC_MASK);
 
         // Build the plain English description
         std::string srcStr;
@@ -161,4 +160,14 @@ void Program::displayCode() const {
 
         std::cout << operation << std::endl;
     }
+}
+
+std::vector<uint32_t> Program::__getstate__() const {
+    // Return only the instructions for pickling
+    return instructions;
+}
+
+void Program::__setstate__(std::vector<uint32_t> state) {
+    // Restore instructions from the state
+    instructions = std::move(state);
 }

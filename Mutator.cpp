@@ -37,14 +37,14 @@ void Mutator::mutateProgram(Program &program) {
         }
     }
 
-    for (uint16_t& instruction : program.instructions) {
-        if (rng(gen) < Parameters::MUTATE_INSTRUCTION_PROBABILITY) {
-            mutateInstruction(instruction);
-        }
+    if (rng(gen) < Parameters::SWAP_INSTRUCTION_PROBABILITY) {
+        std::uniform_int_distribution<> distrib(0, program.instructions.size() - 1);
+        int idx = distrib(gen);
+        mutateInstruction(program.instructions[idx]);
     }
 }
 
-void Mutator::mutateInstruction(uint16_t &instruction) {
+void Mutator::mutateInstruction(uint32_t &instruction) {
     const int INSTRUCTION_NUM_PARTS = 4;
     std::uniform_int_distribution<> distrib(0, INSTRUCTION_NUM_PARTS - 1);
     int index = distrib(gen);
@@ -52,20 +52,20 @@ void Mutator::mutateInstruction(uint16_t &instruction) {
     // Mutate the mode bit
     if (index == 0) {
         // Flips the 14th bit (mode bit)
-        instruction ^= (1 << 14);
+        instruction ^= (MODE_MASK << MODE_SHIFT);
 
         // If the mode bit is 0, then we're using internal registers.
         // Make sure the source register is within the bounds.
-        if (((instruction >> 14) & 1) == 0) {
-            int src = (instruction) & 0xFF;
+        if (((instruction >> MODE_SHIFT) & MODE_MASK) == 0) {
+            int src = (instruction) & SRC_MASK;
             src = src % Parameters::NUM_REGISTERS;
-            instruction &= ~(0xFF); // Clear the current source register
+            instruction &= ~(SRC_MASK); // Clear the current source register
             instruction |= src; // Set the source register to the new clipped value
         }
     }
     // Mutate the op code
     else if (index == 1) {
-        int opCode = (instruction >> 8 & 0b111);
+        int opCode = (instruction >> OPCODE_SHIFT & OPCODE_MASK);
 
         std::uniform_int_distribution<> opDistrib(0, Parameters::NUM_OP_CODES - 1);
         int newOpCode = opDistrib(gen);
@@ -75,23 +75,23 @@ void Mutator::mutateInstruction(uint16_t &instruction) {
         }
 
         // Clear the current op code bits
-        instruction &= ~(0b111 << 8);
+        instruction &= ~(OPCODE_MASK << OPCODE_SHIFT);
 
         // Set the new op code
-        instruction |= (newOpCode << 8);
+        instruction |= (newOpCode << OPCODE_SHIFT);
     }
     // Mutate the source register
     else if (index == 2) {
-        int src = (instruction & 0xFF);
+        int src = (instruction & SRC_MASK);
 
         int newSrc;
         // We're addressing internal registers (mode bit 0)
-        if (((instruction >> 14) & 1) == 0) {
+        if (((instruction >> MODE_SHIFT) & MODE_MASK) == 0) {
             std::uniform_int_distribution<> registerDistrib(0, Parameters::NUM_REGISTERS - 1);
             newSrc = registerDistrib(gen);
 
             if (newSrc == src) {
-                newSrc == registerDistrib(gen);
+                newSrc = registerDistrib(gen);
             }
         }
         // We're addressing features (mode bit 1)
@@ -104,12 +104,12 @@ void Mutator::mutateInstruction(uint16_t &instruction) {
             }
         }
 
-        instruction &= ~(0xFF);
+        instruction &= ~(SRC_MASK);
         instruction |= newSrc;
     }
     // Mutate the destination register
     else if (index == 3) {
-        int dest = (instruction >> 11 & 0b111);
+        int dest = (instruction >> DEST_SHIFT & DEST_MASK);
 
         std::uniform_int_distribution<> registerDistrib(0, Parameters::NUM_REGISTERS - 1);
         int newDest = registerDistrib(gen);
@@ -118,8 +118,8 @@ void Mutator::mutateInstruction(uint16_t &instruction) {
             newDest = registerDistrib(gen);
         }
 
-        instruction &= ~(0b111 << 11);
-        instruction |= (newDest << 11);
+        instruction &= ~(DEST_MASK << DEST_SHIFT);
+        instruction |= (newDest << DEST_SHIFT);
     }
     else
     {
